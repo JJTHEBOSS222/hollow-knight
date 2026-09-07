@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+<base href="https://jsdelivr.net">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no, shrink-to-fit=yes">
+<title>Unity WebGL Player | Hollow Knight</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;user-select:none;-webkit-user-select:none;}
+#loading-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font:24px Arial;z-index:10000}
+#unity-canvas{width:100vw;height:100vh;display:block}
+#fps-graph{position:fixed;top:12px;left:12px;width:200px;height:70px;background:rgba(0,0,0,.8);border-radius:6px;padding:10px;z-index:9999;transition:.3s}
+#fps-canvas{width:100%;height:100%;display:block}
+.savebtn{position:fixed;top:12px;right:12px;padding:10px 18px;cursor:pointer;background:rgba(50,50,50,.85);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font:14px Arial;z-index:9999;transition:.3s}
+.savebtn:hover{background:rgba(70,70,70,.95)}
+.hidden{opacity:0;pointer-events:none}
+
+/* On-Screen Controller Interface Layer - Permanently Visible instantly */
+#mobile-controls {
+    position: fixed;
+    bottom: 0; left: 0; width: 100vw; height: 100vh;
+    pointer-events: none; z-index: 9998; display: block;
+}
+
+/* D-Pad Layout System */
+.dpad-container {
+    position: absolute; bottom: 30px; left: 30px;
+    width: 150px; height: 150px; pointer-events: auto;
+}
+.dpad-btn {
+    position: absolute; width: 50px; height: 50px;
+    background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3);
+    color: #fff; font: bold 18px Arial; display: flex;
+    align-items: center; justify-content: center; touch-action: none;
+}
+.dpad-btn:active { background: rgba(255,255,255,0.45); }
+#dpad-up { top: 0; left: 50px; border-radius: 8px 8px 0 0; }
+#dpad-down { bottom: 0; left: 50px; border-radius: 0 0 8px 8px; }
+#dpad-left { top: 50px; left: 0; border-radius: 8px 0 0 8px; }
+#dpad-right { top: 50px; right: 0; border-radius: 0 8px 8px 0; }
+.dpad-center {
+    position: absolute; top: 50px; left: 50px; width: 50px; height: 50px;
+    background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2);
+}
+
+/* Action Inputs Layer Layout */
+.action-buttons {
+    position: absolute; bottom: 30px; right: 30px;
+    display: grid; grid-template-areas: ". Y ." "X . B" ". A .";
+    gap: 12px; pointer-events: auto;
+}
+.btn {
+    width: 55px; height: 55px; background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.4); border-radius: 50%;
+    color: #fff; font: bold 16px Arial; display: flex;
+    align-items: center; justify-content: center; touch-action: none;
+}
+.btn:active { background: rgba(255,255,255,0.4); }
+#btn-y { grid-area: Y; } #btn-x { grid-area: X; }
+#btn-b { grid-area: B; } #btn-a { grid-area: A; }
+#btn-dash {
+    position: absolute; bottom: 35px; right: 180px;
+    width: 65px; height: 50px; border-radius: 12px; grid-area: unset;
+    pointer-events: auto;
+}
+</style>
+</head>
+<body>
+<div id="loading-text">Loading... 0%</div>
+<canvas id="unity-canvas"></canvas>
+<div id="fps-graph" style="display:none"><canvas id="fps-canvas"></canvas></div>
+
+<!-- Mobile Touch Controller Interface -->
+<div id="mobile-controls">
+    <div class="dpad-container">
+        <div class="dpad-btn" id="dpad-up">▲</div>
+        <div class="dpad-btn" id="dpad-left">◀</div>
+        <div class="dpad-center"></div>
+        <div class="dpad-btn" id="dpad-right">▶</div>
+        <div class="dpad-btn" id="dpad-down">▼</div>
+    </div>
+    <div class="action-buttons">
+        <div class="btn" id="btn-y">Y</div>
+        <div class="btn" id="btn-x">X</div>
+        <div class="btn" id="btn-b">B</div>
+        <div class="btn" id="btn-a">A</div>
+    </div>
+    <div class="btn" id="btn-dash">DASH</div>
+</div>
+
+<script>
+alert("port by bog");
+const lt=document.getElementById("loading-text"),cv=document.getElementById("unity-canvas"),fg=document.getElementById("fps-graph"),fc=document.getElementById("fps-canvas");let lb=0,hd=false,tm_id;const tm='912.81',fh=[],ml=90;fc.width=180;fc.height=50;const ctx=fc.getContext('2d');let lft=performance.now(),fr=0,fps=60,sb;function uf(){const nt=performance.now(),dt=(nt-lft)/1000;lft=nt;fps=dt>0?1/dt:60;fr++;if(fr%3===0){fh.push(fps);if(fh.length>ml)fh.shift();ctx.clearRect(0,0,180,50);for(let i=0;i<fh.length;i++){const f=fh[i],h=Math.min(f/60,1)*35,c=f>50?'#0f0':f>30?'#fa0':'#f33';ctx.fillStyle=c;ctx.fillRect(i*2,50-h,1.8,h);}ctx.fillStyle='#fff';ctx.font='bold 13px monospace';ctx.shadowColor='#000';ctx.shadowBlur=4;ctx.fillText(Math.round(fps)+' FPS',6,16);ctx.shadowBlur=0;}requestAnimationFrame(uf);}function shw(){hd=false;fg.classList.remove('hidden');if(sb)sb.classList.remove('hidden');}function rst(){clearTimeout(tm_id);if(!hd){hd=true;fg.classList.add('hidden');if(sb)sb.classList.add('hidden');}tm_id=setTimeout(shw,5000);}document.addEventListener('keydown',rst);
+
+const totalBytes = parseFloat(tm) * 1048576;
+
+// Clean cross-origin safe progress loader setup targeting live web hosts
+function downloadAsset(url) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.responseType = 'blob';
+        let lastLoaded = 0;
+        
+        xhr.onprogress = (e) => {
+            if (e.lengthComputable || e.loaded) {
+                const diff = e.loaded - lastLoaded;
+                lastLoaded = e.loaded;
+                lb += diff;
+                let pct = Math.min(Math.round((lb / totalBytes) * 100), 100);
+                lt.textContent = `Loading... ${pct}%`;
+            }
+        };
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
+            else reject(new Error(`Status error ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error("Network connection breakdown"));
+        xhr.send();
+    });
+}
+
+async function fetchCombinedFile(paths) {
+    const blobs = [];
+    for (const path of paths) {
+        const blob = await downloadAsset(path);
+        blobs.push(blob);
+    }
+    return URL.createObjectURL(new Blob(blobs));
+}
+
+function gp(f,s,e){return Array.from({length:e-s+1},(_,i)=>`${f}.part${s+i}`);}
+
+// Map interactions on startup loop execution
+setupMobileInput();
+
+(async()=>{
+    try {
+        const du = await fetchCombinedFile(gp("Build/hktruffled.data",1,45));
+        const wu = await fetchCombinedFile(gp("Build/hktruffled.wasm",1,2));
+        
+        const sc = document.createElement("script");
+        sc.src = "Build/hktruffled.loader.js";
+        sc.onload = () => {
+            createUnityInstance(cv,{dataUrl:du,frameworkUrl:"Build/hktruffled.framework.js",codeUrl:wu,streamingAssetsUrl:"StreamingAssets",companyName:"Team Cherry",productName:"Hollow Knight",productVersion:"1.0"}).then(()=>{
+                lt.remove();asb();fg.style.display='block';uf();
+            }).catch(alert);
+        };
+        document.body.appendChild(sc);
+    } catch(e) {
+        alert("Fatal Load Failed: " + e.message + "\nEnsure you are testing over an active web server environment.");
+    }
+})();
+
+function asb(){sb=document.createElement('button');sb.className='savebtn';sb.textContent='download';sb.onclick=sdl;document.body.appendChild(sb);}function odb(n){return new Promise((ok,bd)=>{const r=indexedDB.open(n);r.onsuccess=()=>ok(r.result);r.onerror=()=>bd(r.error);});}function ga(d,s){return new Promise((ok,bd)=>{const t=d.transaction([s],'readonly'),st=t.objectStore(s),r=st.getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>bd(r.error);});}async function sdl(){try{const dbs=await indexedDB.databases();let sv={},fd=false;for(const inf of dbs){const db=await odb(inf.name);for(const st of db.objectStoreNames){try{const dt=await ga(db,st);if(dt&&dt.length>0){const fx=dt.map(it=>{if(it.contents&&it.contents instanceof Uint8Array){return{...it,contents:Array.from(it.contents)};}return it;});sv[`${inf.name}/${st}`]=fx;fd=true;}}catch(e){}}db.close();}if(!fd){alert('No save found');return;}const js=JSON.stringify(sv),bl=new Blob([js],{type:'application/octet-stream'}),u=URL.createObjectURL(bl),a=document.createElement('a');a.href=u;a.download='hk_save.dat';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);}catch(e){alert('Download failed: '+e.message);}}
+
+/* Input Bridge Keyboard Vector Emulation */
+function setupMobileInput() {
+    function fireKey(type, code, key) {
+        window.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, keyCode: code, code: code, key: key }));
+    }
+    function mapBtn(id, code, key) {
+        const el = document.getElementById(id);
+        if(!el) return;
+        el.addEventListener('touchstart', (e) => { e.preventDefault(); fireKey('keydown', code, key); });
+        el.addEventListener('touchend', (e) => { e.preventDefault(); fireKey('keyup', code, key); });
+    }
+    // Action inputs configurations map layout
+    mapBtn('btn-x', 88, 'x');     mapBtn('btn-a', 32, ' ');
+    mapBtn('btn-b', 90, 'z');     mapBtn('btn-y', 67, 'c');
+    mapBtn('btn-dash', 16, 'Shift');
+
+    // Directional keys layout mapping configurations
+    mapBtn('dpad-up', 38, 'ArrowUp');
+    mapBtn('dpad-down', 40, 'ArrowDown');
+    mapBtn('dpad-left', 37, 'ArrowLeft');
+    mapBtn('dpad-right', 39, 'ArrowRight');
+}
+</script>
+</body>
+</html>
