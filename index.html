@@ -16,14 +16,14 @@ body{background:#000;overflow:hidden;user-select:none;-webkit-user-select:none;}
 .savebtn:hover{background:rgba(70,70,70,.95)}
 .hidden{opacity:0;pointer-events:none}
 
-/* On-Screen Controller Interface Layer - Permanently Visible instantly */
+/* Mobile Controls Overlay - Forced Visible Immediately */
 #mobile-controls {
     position: fixed;
     bottom: 0; left: 0; width: 100vw; height: 100vh;
     pointer-events: none; z-index: 9998; display: block;
 }
 
-/* D-Pad Layout System */
+/* D-Pad Styling */
 .dpad-container {
     position: absolute; bottom: 30px; left: 30px;
     width: 150px; height: 150px; pointer-events: auto;
@@ -44,7 +44,7 @@ body{background:#000;overflow:hidden;user-select:none;-webkit-user-select:none;}
     background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2);
 }
 
-/* Action Inputs Layer Layout */
+/* Action Buttons Layer Rules */
 .action-buttons {
     position: absolute; bottom: 30px; right: 30px;
     display: grid; grid-template-areas: ". Y ." "X . B" ". A .";
@@ -71,7 +71,7 @@ body{background:#000;overflow:hidden;user-select:none;-webkit-user-select:none;}
 <canvas id="unity-canvas"></canvas>
 <div id="fps-graph" style="display:none"><canvas id="fps-canvas"></canvas></div>
 
-<!-- Mobile Touch Controller Interface -->
+<!-- Mobile On-Screen Controls Interface -->
 <div id="mobile-controls">
     <div class="dpad-container">
         <div class="dpad-btn" id="dpad-up">▲</div>
@@ -94,51 +94,50 @@ alert("port by bog");
 const lt=document.getElementById("loading-text"),cv=document.getElementById("unity-canvas"),fg=document.getElementById("fps-graph"),fc=document.getElementById("fps-canvas");let lb=0,hd=false,tm_id;const tm='912.81',fh=[],ml=90;fc.width=180;fc.height=50;const ctx=fc.getContext('2d');let lft=performance.now(),fr=0,fps=60,sb;function uf(){const nt=performance.now(),dt=(nt-lft)/1000;lft=nt;fps=dt>0?1/dt:60;fr++;if(fr%3===0){fh.push(fps);if(fh.length>ml)fh.shift();ctx.clearRect(0,0,180,50);for(let i=0;i<fh.length;i++){const f=fh[i],h=Math.min(f/60,1)*35,c=f>50?'#0f0':f>30?'#fa0':'#f33';ctx.fillStyle=c;ctx.fillRect(i*2,50-h,1.8,h);}ctx.fillStyle='#fff';ctx.font='bold 13px monospace';ctx.shadowColor='#000';ctx.shadowBlur=4;ctx.fillText(Math.round(fps)+' FPS',6,16);ctx.shadowBlur=0;}requestAnimationFrame(uf);}function shw(){hd=false;fg.classList.remove('hidden');if(sb)sb.classList.remove('hidden');}function rst(){clearTimeout(tm_id);if(!hd){hd=true;fg.classList.add('hidden');if(sb)sb.classList.add('hidden');}tm_id=setTimeout(shw,5000);}document.addEventListener('keydown',rst);
 
 const totalBytes = parseFloat(tm) * 1048576;
+const partWeights = {};
 
-// Clean cross-origin safe progress loader setup targeting live web hosts
-function downloadAsset(url) {
-    return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.responseType = 'blob';
-        let lastLoaded = 0;
+// Optimized fetch pipeline with explicit error handlers and fail-safes
+async function fetchPartWithProgress(url) {
+    const r = await fetch(url, { method: 'GET', mode: 'cors', credentials: 'omit' });
+    if (!r.ok) throw new Error(`HTTP fault: ${r.status} on ${url}`);
+    
+    const contentLength = parseInt(r.headers.get('content-length')) || 20971520; 
+    partWeights[url] = { loaded: 0, total: contentLength };
+
+    const rd = r.body.getReader();
+    const chunks = [];
+    while (true) {
+        const { done, value } = await rd.read();
+        if (done) break;
+        chunks.push(value);
+        partWeights[url].loaded += value.length;
         
-        xhr.onprogress = (e) => {
-            if (e.lengthComputable || e.loaded) {
-                const diff = e.loaded - lastLoaded;
-                lastLoaded = e.loaded;
-                lb += diff;
-                let pct = Math.min(Math.round((lb / totalBytes) * 100), 100);
-                lt.textContent = `Loading... ${pct}%`;
-            }
-        };
-        xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
-            else reject(new Error(`Status error ${xhr.status}`));
-        };
-        xhr.onerror = () => reject(new Error("Network connection breakdown"));
-        xhr.send();
-    });
+        let currentTotalLoaded = 0;
+        for (let key in partWeights) {
+            currentTotalLoaded += partWeights[key].loaded;
+        }
+        let pct = Math.min(Math.round((currentTotalLoaded / totalBytes) * 100), 100);
+        lt.textContent = `Loading... ${pct}%`;
+    }
+    return new Blob(chunks);
 }
 
 async function fetchCombinedFile(paths) {
-    const blobs = [];
-    for (const path of paths) {
-        const blob = await downloadAsset(path);
-        blobs.push(blob);
-    }
+    const blobs = await Promise.all(paths.map(p => fetchPartWithProgress(p)));
     return URL.createObjectURL(new Blob(blobs));
 }
 
 function gp(f,s,e){return Array.from({length:e-s+1},(_,i)=>`${f}.part${s+i}`);}
 
-// Map interactions on startup loop execution
+// Map the screen interaction maps immediately
 setupMobileInput();
 
 (async()=>{
     try {
-        const du = await fetchCombinedFile(gp("Build/hktruffled.data",1,45));
-        const wu = await fetchCombinedFile(gp("Build/hktruffled.wasm",1,2));
+        const [du, wu] = await Promise.all([
+            fetchCombinedFile(gp("Build/hktruffled.data", 1, 45)),
+            fetchCombinedFile(gp("Build/hktruffled.wasm", 1, 2))
+        ]);
         
         const sc = document.createElement("script");
         sc.src = "Build/hktruffled.loader.js";
@@ -149,13 +148,13 @@ setupMobileInput();
         };
         document.body.appendChild(sc);
     } catch(e) {
-        alert("Fatal Load Failed: " + e.message + "\nEnsure you are testing over an active web server environment.");
+        alert("Fatal Application Sync Error: " + e.message + "\nEnsure your GitHub repository visibility settings are configured to Public.");
     }
 })();
 
 function asb(){sb=document.createElement('button');sb.className='savebtn';sb.textContent='download';sb.onclick=sdl;document.body.appendChild(sb);}function odb(n){return new Promise((ok,bd)=>{const r=indexedDB.open(n);r.onsuccess=()=>ok(r.result);r.onerror=()=>bd(r.error);});}function ga(d,s){return new Promise((ok,bd)=>{const t=d.transaction([s],'readonly'),st=t.objectStore(s),r=st.getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>bd(r.error);});}async function sdl(){try{const dbs=await indexedDB.databases();let sv={},fd=false;for(const inf of dbs){const db=await odb(inf.name);for(const st of db.objectStoreNames){try{const dt=await ga(db,st);if(dt&&dt.length>0){const fx=dt.map(it=>{if(it.contents&&it.contents instanceof Uint8Array){return{...it,contents:Array.from(it.contents)};}return it;});sv[`${inf.name}/${st}`]=fx;fd=true;}}catch(e){}}db.close();}if(!fd){alert('No save found');return;}const js=JSON.stringify(sv),bl=new Blob([js],{type:'application/octet-stream'}),u=URL.createObjectURL(bl),a=document.createElement('a');a.href=u;a.download='hk_save.dat';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);}catch(e){alert('Download failed: '+e.message);}}
 
-/* Input Bridge Keyboard Vector Emulation */
+/* Touch Interface to Desktop Keyboard Signal Bridge */
 function setupMobileInput() {
     function fireKey(type, code, key) {
         window.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, keyCode: code, code: code, key: key }));
@@ -166,12 +165,12 @@ function setupMobileInput() {
         el.addEventListener('touchstart', (e) => { e.preventDefault(); fireKey('keydown', code, key); });
         el.addEventListener('touchend', (e) => { e.preventDefault(); fireKey('keyup', code, key); });
     }
-    // Action inputs configurations map layout
+    // Actions map bindings configuration
     mapBtn('btn-x', 88, 'x');     mapBtn('btn-a', 32, ' ');
     mapBtn('btn-b', 90, 'z');     mapBtn('btn-y', 67, 'c');
     mapBtn('btn-dash', 16, 'Shift');
 
-    // Directional keys layout mapping configurations
+    // Directional vectors config map layouts
     mapBtn('dpad-up', 38, 'ArrowUp');
     mapBtn('dpad-down', 40, 'ArrowDown');
     mapBtn('dpad-left', 37, 'ArrowLeft');
